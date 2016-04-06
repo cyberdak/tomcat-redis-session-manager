@@ -1,13 +1,7 @@
 package com.orangefunction.tomcat.redissessions;
 
-import org.apache.catalina.Lifecycle;
-import org.apache.catalina.LifecycleException;
-import org.apache.catalina.LifecycleListener;
+import org.apache.catalina.*;
 import org.apache.catalina.util.LifecycleSupport;
-import org.apache.catalina.LifecycleState;
-import org.apache.catalina.Loader;
-import org.apache.catalina.Valve;
-import org.apache.catalina.Session;
 import org.apache.catalina.session.ManagerBase;
 
 import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
@@ -274,8 +268,10 @@ public class RedisSessionManager extends ManagerBase implements Lifecycle {
 
     setState(LifecycleState.STARTING);
 
+    Context context = getContext();
+
     Boolean attachedToValve = false;
-    for (Valve valve : getContainer().getPipeline().getValves()) {
+    for (Valve valve : context.getPipeline().getValves()) {
       if (valve instanceof RedisSessionHandlerValve) {
         this.handlerValve = (RedisSessionHandlerValve) valve;
         this.handlerValve.setRedisSessionManager(this);
@@ -298,11 +294,12 @@ public class RedisSessionManager extends ManagerBase implements Lifecycle {
       throw new LifecycleException(e);
     }
 
-    log.info("Will expire sessions after " + getMaxInactiveInterval() + " seconds");
+    log.info("Will expire sessions after " + context.getSessionTimeout() + " seconds");
 
     initializeDatabaseConnection();
 
-    setDistributable(true);
+    context.setDistributable(true);
+    //setDistributable(true);
   }
 
 
@@ -367,7 +364,7 @@ public class RedisSessionManager extends ManagerBase implements Lifecycle {
         session.setNew(true);
         session.setValid(true);
         session.setCreationTime(System.currentTimeMillis());
-        session.setMaxInactiveInterval(getMaxInactiveInterval());
+        session.setMaxInactiveInterval(getContext().getSessionTimeout());
         session.setId(sessionId);
         session.tellNew();
       }
@@ -535,7 +532,8 @@ public class RedisSessionManager extends ManagerBase implements Lifecycle {
 
       session.setId(id);
       session.setNew(false);
-      session.setMaxInactiveInterval(getMaxInactiveInterval());
+      int sessionTimeout = getContext().getSessionTimeout();
+      session.setMaxInactiveInterval(sessionTimeout);
       session.access();
       session.setValid(true);
       session.resetDirtyTracking();
@@ -714,8 +712,8 @@ public class RedisSessionManager extends ManagerBase implements Lifecycle {
 
     Loader loader = null;
 
-    if (getContainer() != null) {
-      loader = getContainer().getLoader();
+    if (getContext() != null) {
+      loader = getContext().getLoader();
     }
 
     ClassLoader classLoader = null;
